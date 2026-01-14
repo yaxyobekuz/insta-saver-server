@@ -1,10 +1,10 @@
 // Models
-const User = require("../models/user.model");
+const Owner = require("../models/owner.model");
 
 // Utils
 const { verifyToken } = require("../utils/jwt.utils");
 
-// Auth middleware
+// Auth middleware for Owner
 const protect = async (req, res, next) => {
   try {
     let token;
@@ -34,25 +34,18 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Find user by ID from token
-    const user = await User.findById(decoded.id).select("-password");
+    // Find owner by ID from token
+    const owner = await Owner.findById(decoded.id).select("-password");
 
-    if (!user) {
+    if (!owner) {
       return res.status(401).json({
         success: false,
         message: "Foydalanuvchi topilmadi",
       });
     }
 
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "Sizning hisobingiz faol emas",
-      });
-    }
-
-    // Add user to request object
-    req.user = user;
+    // Add owner to request object
+    req.user = owner;
     next();
   } catch (error) {
     res.status(401).json({
@@ -63,17 +56,4 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Role-based access control
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `${req.user.role} roli uchun ruxsat berilmagan`,
-      });
-    }
-    next();
-  };
-};
-
-module.exports = { protect, authorize };
+module.exports = { protect };
