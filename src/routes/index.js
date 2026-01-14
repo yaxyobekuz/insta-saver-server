@@ -7,12 +7,14 @@ const authRoutes = require("./auth.routes");
 const userRoutes = require("./user.routes");
 const broadcastRoutes = require("./broadcast.routes");
 const settingsRoutes = require("./settings.routes");
+const inviteLinkRoutes = require("./inviteLink.routes");
 
 // Routes
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 router.use("/broadcasts", broadcastRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/invite-links", inviteLinkRoutes);
 
 // Health check
 router.get("/health", (req, res) => {
