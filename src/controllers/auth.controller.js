@@ -1,4 +1,4 @@
-const User = require("../models/user.model");
+const Owner = require("../models/owner.model");
 const { generateToken } = require("../utils/jwt.utils");
 
 // Login
@@ -10,42 +10,33 @@ const login = async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: "Username and password are required",
+        message: "Username va password talab qilinadi",
       });
     }
 
-    // Find user
-    const user = await User.findOne({ username: username.toLowerCase() });
+    // Find owner
+    const owner = await Owner.findOne({ username: username.toLowerCase() });
 
-    if (!user || !(await user.matchPassword(password))) {
+    if (!owner || !(await owner.matchPassword(password))) {
       return res.status(400).json({
         success: false,
-        message: "Incorrect username or password",
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Your account is not active",
+        message: "Noto'g'ri username yoki password",
       });
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(owner._id);
 
     // Return response
     res.json({
       success: true,
       data: {
         user: {
-          id: user._id,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: user.fullName,
-          role: user.role,
-          class: user.class,
+          id: owner._id,
+          username: owner.username,
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+          fullName: owner.fullName,
         },
         token,
       },
@@ -53,28 +44,46 @@ const login = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server xatosi",
       error: error.message,
     });
   }
 };
 
-// Get current user data
+// Get current owner data
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const owner = await Owner.findById(req.user.id).select("-password");
 
     res.json({
       success: true,
-      data: user,
+      data: owner,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server xatosi",
       error: error.message,
     });
   }
 };
 
-module.exports = { login, getMe };
+// Initialize default owner (called on server start)
+const initDefaultOwner = async () => {
+  try {
+    const existingOwner = await Owner.findOne();
+    if (!existingOwner) {
+      await Owner.create({
+        username: process.env.DEFAULT_OWNER_USERNAME || "admin",
+        password: process.env.DEFAULT_OWNER_PASSWORD || "admin123",
+        firstName: process.env.DEFAULT_OWNER_FIRSTNAME || "Administrator",
+        lastName: process.env.DEFAULT_OWNER_LASTNAME || "",
+      });
+      console.log("Default owner created successfully");
+    }
+  } catch (error) {
+    console.error("Error creating default owner:", error.message);
+  }
+};
+
+module.exports = { login, getMe, initDefaultOwner };

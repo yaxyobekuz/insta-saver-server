@@ -1,25 +1,91 @@
 const User = require("../models/user.model");
 
-// Get all users (Owner only)
+// Supported languages list
+const SUPPORTED_LANGUAGES = [
+  "uz", "en", "ru", "kk", "ky", "tr", "tg", "tk", "az", "fa", "ar",
+  "pt-pt", "pt-br", "es", "fr", "de", "it", "id", "hi", "uk", "pl",
+  "vi", "th", "ko", "ja", "nl", "ro", "cs", "hu", "el", "sv", "da", "fi", "zh"
+];
+
+// Get all users with advanced filtering
 const getAllUsers = async (req, res) => {
   try {
-    const { role, page = 1, limit = 24 } = req.query;
+    const {
+      page = 1,
+      limit = 24,
+      lang,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      recentDays,
+      statsFilter,
+    } = req.query;
 
+    // Build query
     let query = {};
-    if (role) query.role = role;
+
+    // Language filter
+    if (lang && lang !== "all") {
+      query.lang = lang;
+    }
+
+    // Search filter (username, firstName, lastName)
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { username: searchRegex },
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+      ];
+    }
+
+    // Recent days filter
+    if (recentDays && !isNaN(parseInt(recentDays))) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - parseInt(recentDays));
+      query.createdAt = { $gte: daysAgo };
+    }
+
+    // Stats filter
+    if (statsFilter) {
+      switch (statsFilter) {
+        case "high_success":
+          query["stats.success"] = { $gte: 10 };
+          break;
+        case "high_failed":
+          query["stats.failed"] = { $gte: 5 };
+          break;
+        case "low_activity":
+          query["stats.total"] = { $lte: 5 };
+          break;
+        case "high_activity":
+          query["stats.total"] = { $gte: 20 };
+          break;
+      }
+    }
+
+    // Build sort
+    const sortOptions = {};
+    const validSortFields = ["createdAt", "stats.success", "stats.failed", "stats.total"];
+    if (validSortFields.includes(sortBy)) {
+      sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+    } else {
+      sortOptions.createdAt = -1;
+    }
 
     // Convert to numbers
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
+    // Execute query with count
     const [total, users] = await Promise.all([
       User.countDocuments(query),
       User.find(query)
-        .select("-password")
-        .sort({ createdAt: -1 })
+        .sort(sortOptions)
         .skip(skip)
-        .limit(limitNum),
+        .limit(limitNum)
+        .lean(),
     ]);
 
     // Calculate pagination info
@@ -42,52 +108,60 @@ const getAllUsers = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server xatosi",
       error: error.message,
     });
   }
 };
 
-// Update user (Owner only)
-const updateUser = async (req, res) => {
+// Get user statistics summary
+const getUserStats = async (req, res) => {
   try {
-    const { firstName, lastName, isActive } = req.body;
-
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Owner cannot be modified
-    if (user.role === "owner") {
-      return res.status(403).json({
-        success: false,
-        message: "Owner user cannot be modified",
-      });
-    }
-
-    // Update data
-    if (firstName) user.firstName = firstName;
-    if (lastName) user.lastName = lastName;
-    if (isActive !== undefined) user.isActive = isActive;
-
-    await user.save();
-
-    const updatedUser = await User.findById(user._id).select("-password");
+    const [totalUsers, languageStats] = await Promise.all([
+      User.countDocuments(),
+      User.aggregate([
+        { $group: { _id: "$lang", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
 
     res.json({
       success: true,
-      message: "User successfully updated",
-      data: updatedUser,
+      data: {
+        totalUsers,
+        languageStats,
+        supportedLanguages: SUPPORTED_LANGUAGES,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Server xatosi",
+      error: error.message,
+    });
+  }
+};
+
+// Get single user by ID
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Foydalanuvchi topilmadi",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server xatosi",
       error: error.message,
     });
   }
@@ -95,5 +169,7 @@ const updateUser = async (req, res) => {
 
 module.exports = {
   getAllUsers,
-  updateUser,
+  getUserStats,
+  getUserById,
+  SUPPORTED_LANGUAGES,
 };
