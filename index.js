@@ -17,6 +17,10 @@ const routes = require("./src/routes");
 // Database connection
 const connectDB = require("./src/config/database");
 
+// Init functions
+const { initDefaultOwner } = require("./src/controllers/auth.controller");
+const { initSettings } = require("./src/controllers/settings.controller");
+
 // Middlewares
 const { errorHandler, notFound } = require("./src/middleware/error.middleware");
 
@@ -25,8 +29,12 @@ const { errorHandler, notFound } = require("./src/middleware/error.middleware");
 // Initialize app
 const app = express();
 
-// Connect to database
-connectDB();
+// Connect to database and initialize
+(async () => {
+  await connectDB();
+  await initDefaultOwner();
+  await initSettings();
+})();
 
 // Trust proxy
 app.set("trust proxy", 1);
