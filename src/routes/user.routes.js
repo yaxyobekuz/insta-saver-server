@@ -1,14 +1,22 @@
 const express = require("express");
 const router = express.Router();
-const { getAllUsers, updateUser } = require("../controllers/user.controller");
-const { protect, authorize } = require("../middleware/auth.middleware");
+const {
+  getAllUsers,
+  getUserStats,
+  getUserById,
+} = require("../controllers/user.controller");
+const { protect } = require("../middleware/auth.middleware");
 
-// All routes are protected and for owner only
+// All routes are protected
 router.use(protect);
-router.use(authorize("owner"));
 
-router.route("/").get(getAllUsers);
+// GET /api/users - Get all users with filtering
+router.get("/", getAllUsers);
 
-router.route("/:id").put(updateUser);
+// GET /api/users/stats - Get user statistics
+router.get("/stats", getUserStats);
+
+// GET /api/users/:id - Get user by ID
+router.get("/:id", getUserById);
 
 module.exports = router;
